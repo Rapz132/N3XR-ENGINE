@@ -45,10 +45,25 @@ jobs:
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
           "$SDKMANAGER" --install "ndk;27.2.12479018"
 
-      - name: Configure NDK
+      - name: Configure Android Linker
+        shell: bash
         run: |
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
-          echo "CARGO_TARGET_${{ matrix.target }}_LINKER=$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.linker }}" >> "$GITHUB_ENV"
+          NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+          TARGET_KEY=$(echo "${{ matrix.target }}" | tr '[:lower:]-' '[:upper:]_')
+          LINKER="$TOOLCHAIN/${{ matrix.linker }}"
+
+          if [ ! -x "$LINKER" ]; then
+            echo "Android linker not found: $LINKER"
+            exit 1
+          fi
+
+          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_${TARGET_KEY}_LINKER=$LINKER" >> "$GITHUB_ENV"
+
+          echo "Using linker: $LINKER"
+          echo "Cargo target key: CARGO_TARGET_${TARGET_KEY}_LINKER"
 
       - name: Build Engine
         run: cargo build --release --target ${{ matrix.target }}
