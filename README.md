@@ -1,25 +1,28 @@
 
 # N3XR Engine
 
-N3XR is an experimental Rust-based 3D block game engine.
+Experimental Rust-based 3D block game engine.
 
 ## Version
-0.1.0
+0.2.0
 
-## Language
+## Technology
 - Rust
+- OpenGL ES 3.0
+- Android NDK
+- EGL
 
-## Initial Features
-- Engine initialization
-- Renderer foundation
-- Block system
-- Chunk storage
-- World management
-- Player movement foundation
+## Features
+- Native engine foundation
+- OpenGL ES 3 renderer
+- Shader compilation
+- Triangle rendering test
+- Renderer lifecycle API
+- Block and chunk foundation
 
-## Platforms
-- Android ARM32
-- Android ARM64
+## Android Targets
+- armeabi-v7a
+- arm64-v8a
 
 ## License
 GPL-3.0
