@@ -1,0 +1,20 @@
+
+[package]
+name = "n3xr_engine"
+version = "0.1.0"
+edition = "2021"
+description = "N3XR Rust-based 3D Block Game Engine"
+license = "GPL-3.0"
+
+[lib]
+name = "n3xr_engine"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+jni = "0.21"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
