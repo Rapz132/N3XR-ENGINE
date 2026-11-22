@@ -1,8 +1,4 @@
 //! Face culling dan pembuatan vertex untuk satu section 16x16x16.
-//!
-//! Input: array ID block (u16) dan tabel flag per ID (FLAG_VISIBLE / FLAG_OPAQUE).
-//! Output: vertex ringkas 8 byte dan indeks u32. Konversi ke format vertex
-//! Minecraft dilakukan di sisi Java.
 
 use crate::block::{FLAG_OPAQUE, FLAG_VISIBLE};
 
@@ -129,12 +125,13 @@ pub fn build_section_mesh(
                 }
                 for (face, (dx, dy, dz)) in DIRS.iter().enumerate() {
                     let (nx, ny, nz) = (x as i32 + dx, y as i32 + dy, z as i32 + dz);
-                    let inside = (0..s).contains(&nx) && (0..s).contains(&ny) && (0..s).contains(&nz);
+                    let inside = (0..s).contains(&nx)
+                        && (0..s).contains(&ny)
+                        && (0..s).contains(&nz);
                     let neighbor_id = if inside {
                         Some(blocks[index(nx as usize, ny as usize, nz as usize)])
                     } else {
-                        neighbors.faces[face]
-                            .map(|sec| sec[index(wrap(nx), wrap(ny), wrap(nz))])
+                        neighbors.faces[face].map(|sec| sec[index(wrap(nx), wrap(ny), wrap(nz))])
                     };
                     let hidden = match neighbor_id {
                         Some(n) => flag_of(n) & FLAG_OPAQUE != 0 || n == id,
