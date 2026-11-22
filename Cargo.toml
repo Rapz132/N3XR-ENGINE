@@ -1,20 +1,27 @@
-
 [package]
 name = "n3xr_engine"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2021"
-description = "N3XR Rust-based 3D Block Game Engine"
+description = "N3XR-ENGINE: Rust acceleration core for Minecraft Java Edition 1.21 (JNI)"
 license = "GPL-3.0"
+repository = "https://github.com/Rapz132/N3XR-ENGINE"
+rust-version = "1.75"
 
 [lib]
 name = "n3xr_engine"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-gl = "0.14"
+jni = "0.21"
+gl = { version = "0.14", optional = true }
+
+[features]
+default = []
+legacy-gl = ["dep:gl"]
 
 [profile.release]
 opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+panic = "abort"
