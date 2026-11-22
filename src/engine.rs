@@ -1,9 +1,10 @@
-
+#[cfg(feature = "legacy-gl")]
 use crate::renderer::Renderer;
 use crate::world::World;
 
 pub struct Engine {
     pub initialized: bool,
+    #[cfg(feature = "legacy-gl")]
     pub renderer: Renderer,
     pub world: World,
 }
@@ -12,6 +13,7 @@ impl Engine {
     pub fn new() -> Result<Self, String> {
         Ok(Self {
             initialized: true,
+            #[cfg(feature = "legacy-gl")]
             renderer: Renderer::new(),
             world: World::new(),
         })
@@ -22,6 +24,7 @@ impl Engine {
             return;
         }
 
+        #[cfg(feature = "legacy-gl")]
         self.renderer.update(delta_time);
         self.world.update(delta_time);
     }
