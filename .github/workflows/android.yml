@@ -125,8 +125,11 @@ jobs:
           echo "--- Exported symbols ---"
           "$NDK_TOOLCHAIN_BIN/llvm-nm" -D --defined-only "$LIB" | grep -E "n3xr|Java_" || true
 
-          # Tambahkan simbol JNI (Java_...) ke daftar ini setelah jni_api.rs ada.
-          REQUIRED="n3xr_engine_version n3xr_engine_create n3xr_engine_update n3xr_engine_destroy"
+          REQUIRED="n3xr_engine_version n3xr_engine_create n3xr_engine_update n3xr_engine_destroy \
+            Java_com_rapz_n3xr_NativeBridge_nativeVersion \
+            Java_com_rapz_n3xr_NativeBridge_nativeInit \
+            Java_com_rapz_n3xr_NativeBridge_nativeShutdown \
+            Java_com_rapz_n3xr_NativeBridge_nativeBuildSections"
           for SYM in $REQUIRED; do
             "$NDK_TOOLCHAIN_BIN/llvm-nm" -D --defined-only "$LIB" | grep -qw "$SYM" \
               || { echo "::error::Missing exported symbol: $SYM"; exit 1; }
