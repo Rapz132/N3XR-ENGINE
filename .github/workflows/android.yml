@@ -1,22 +1,50 @@
-
 name: N3XR Engine Android Build
 
 on:
   workflow_dispatch:
+  pull_request:
   push:
     branches:
       - main
+      - dev
     paths:
       - "src/**"
+      - "java/**"
+      - "benches/**"
+      - "tests/**"
       - "Cargo.toml"
+      - "Cargo.lock"
       - ".github/workflows/android.yml"
 
 permissions:
   contents: read
 
+env:
+  NDK_VERSION: "27.2.12479018"
+  API_LEVEL: "24"
+
 jobs:
+  test:
+    name: Format and Test (host)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run tests
+        run: cargo test --all-targets
+
   build:
     name: Build Android ${{ matrix.abi }}
+    needs: test
     runs-on: ubuntu-latest
 
     strategy:
@@ -25,51 +53,115 @@ jobs:
         include:
           - abi: armeabi-v7a
             target: armv7-linux-androideabi
-            linker: armv7a-linux-androideabi24-clang
-
+            clang: armv7a-linux-androideabi24-clang
+            elf_arch: ARM
           - abi: arm64-v8a
             target: aarch64-linux-android
-            linker: aarch64-linux-android24-clang
+            clang: aarch64-linux-android24-clang
+            elf_arch: AArch64
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install Android NDK
-        run: |
-          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
-          "$SDKMANAGER" --install "ndk;27.2.12479018"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
-      - name: Configure Android Linker
+      - name: Install Android NDK
         shell: bash
         run: |
-          NDK="$ANDROID_HOME/ndk/27.2.12479018"
-          TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "ndk;${NDK_VERSION}"
 
-          TARGET_KEY=$(echo "${{ matrix.target }}" | tr '[:lower:]-' '[:upper:]_')
-          LINKER="$TOOLCHAIN/${{ matrix.linker }}"
+      - name: Configure Android linker
+        shell: bash
+        run: |
+          NDK="$ANDROID_HOME/ndk/${NDK_VERSION}"
+          TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          LINKER="$TOOLCHAIN/${{ matrix.clang }}"
 
           if [ ! -x "$LINKER" ]; then
-            echo "Android linker not found: $LINKER"
+            echo "::error::Android linker not found: $LINKER"
             exit 1
           fi
 
-          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
-          echo "CARGO_TARGET_${TARGET_KEY}_LINKER=$LINKER" >> "$GITHUB_ENV"
+          TARGET="${{ matrix.target }}"
+          TARGET_KEY=$(echo "$TARGET" | tr '[:lower:]-' '[:upper:]_')
+          TARGET_ENV=$(echo "$TARGET" | tr '-' '_')
+
+          {
+            echo "ANDROID_NDK_HOME=$NDK"
+            echo "NDK_TOOLCHAIN_BIN=$TOOLCHAIN"
+            echo "CARGO_TARGET_${TARGET_KEY}_LINKER=$LINKER"
+            echo "CC_${TARGET_ENV}=$LINKER"
+            echo "AR_${TARGET_ENV}=$TOOLCHAIN/llvm-ar"
+          } >> "$GITHUB_ENV"
 
           echo "Using linker: $LINKER"
-          echo "Cargo target key: CARGO_TARGET_${TARGET_KEY}_LINKER"
 
-      - name: Build Engine
+      - name: Build release library
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Upload Engine Library
+      - name: Verify library
+        shell: bash
+        run: |
+          LIB="target/${{ matrix.target }}/release/libn3xr_engine.so"
+
+          if [ ! -f "$LIB" ]; then
+            echo "::error::Library not produced: $LIB"
+            exit 1
+          fi
+
+          echo "--- ELF header ---"
+          "$NDK_TOOLCHAIN_BIN/llvm-readelf" -h "$LIB" | grep -E "Class|Machine"
+          "$NDK_TOOLCHAIN_BIN/llvm-readelf" -h "$LIB" | grep -q "Machine:.*${{ matrix.elf_arch }}" \
+            || { echo "::error::Wrong ELF architecture"; exit 1; }
+
+          echo "--- Exported symbols ---"
+          "$NDK_TOOLCHAIN_BIN/llvm-nm" -D --defined-only "$LIB" | grep -E "n3xr|Java_" || true
+
+          # Tambahkan simbol JNI (Java_...) ke daftar ini setelah jni_api.rs ada.
+          REQUIRED="n3xr_engine_version n3xr_engine_create n3xr_engine_update n3xr_engine_destroy"
+          for SYM in $REQUIRED; do
+            "$NDK_TOOLCHAIN_BIN/llvm-nm" -D --defined-only "$LIB" | grep -qw "$SYM" \
+              || { echo "::error::Missing exported symbol: $SYM"; exit 1; }
+          done
+
+          mkdir -p "dist/${{ matrix.abi }}"
+          cp "$LIB" "dist/${{ matrix.abi }}/libn3xr_engine.so"
+          ls -l "dist/${{ matrix.abi }}"
+
+      - name: Upload ABI artifact
         uses: actions/upload-artifact@v4
         with:
           name: N3XR-Engine-${{ matrix.abi }}
-          path: target/${{ matrix.target }}/release/libn3xr_engine.so
+          path: dist/*/libn3xr_engine.so
+          if-no-files-found: error
+
+  package:
+    name: Package both ABIs
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: N3XR-Engine-*
+          path: bundle
+          merge-multiple: true
+
+      - name: Check layout
+        run: |
+          test -f bundle/armeabi-v7a/libn3xr_engine.so
+          test -f bundle/arm64-v8a/libn3xr_engine.so
+          find bundle -type f -exec ls -l {} \;
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: N3XR-Engine-1.0.0-android
+          path: bundle/
+          if-no-files-found: error
