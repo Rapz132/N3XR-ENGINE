@@ -4,7 +4,9 @@
 pub mod block;
 pub mod chunk;
 pub mod engine;
+pub mod facemask;
 pub mod jni_api;
+pub mod jni_mask;
 pub mod mesh;
 pub mod player;
 pub mod world;
