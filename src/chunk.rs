@@ -1,21 +1,33 @@
-
 use crate::block::Block;
 
 pub const CHUNK_SIZE: usize = 16;
 pub const CHUNK_HEIGHT: usize = 64;
+pub const CHUNK_VOLUME: usize = CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE;
 
 pub struct Chunk {
     pub blocks: Vec<Block>,
 }
 
+impl Default for Chunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Chunk {
     pub fn new() -> Self {
         Self {
-            blocks: vec![
-                Block::Air;
-                CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE
-            ],
+            blocks: vec![Block::Air; CHUNK_VOLUME],
         }
+    }
+
+    /// Membuat chunk dari data yang sudah ada.
+    /// Mengembalikan None jika panjang data tidak sama dengan CHUNK_VOLUME.
+    pub fn from_blocks(blocks: Vec<Block>) -> Option<Self> {
+        if blocks.len() != CHUNK_VOLUME {
+            return None;
+        }
+        Some(Self { blocks })
     }
 
     pub fn get_index(x: usize, y: usize, z: usize) -> Option<usize> {
