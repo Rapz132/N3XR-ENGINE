@@ -3,6 +3,7 @@ pub mod engine;
 pub mod renderer;
 pub mod world;
 pub mod chunk;
+pub mod mesh;
 pub mod block;
 pub mod player;
 
